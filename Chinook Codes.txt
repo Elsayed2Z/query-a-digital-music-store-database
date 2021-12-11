@@ -1,0 +1,94 @@
+/*1 -find the Artist name and total track count of the top 10 rock bands?*/
+
+SELECT at.ArtistId,
+       at.name,
+       COUNT(t.name) AS songs
+FROM Track AS t
+JOIN Album AS am ON am.AlbumId = t.AlbumId
+JOIN Artist AS AT ON at.ArtistId = am.ArtistId
+JOIN Genre AS g ON g.GenreId =t.GenreId
+WHERE g.name ='Rock'
+GROUP BY 1,
+         2
+ORDER BY 3 DESC
+LIMIT 10;
+
+/* 2 - the most popular music Genre for each country?*/
+
+WITH t_all AS
+  (SELECT COUNT(g.name) g_count,
+          c.Country,
+          g.name,
+          g.GenreId,
+          c.CustomerId
+   FROM Customer c
+   JOIN invoice i ON c.CustomerId = i.CustomerId
+   JOIN InvoiceLine il ON i.InvoiceId = il.InvoiceId
+   JOIN Track t ON t.TrackId = il.TrackId
+   JOIN Genre g ON g.GenreId = t.GenreId
+   GROUP BY 2,
+            3
+   ORDER BY 2),
+     maxed AS
+  (SELECT MAX(t.g_count) mmx,
+          c.Country,
+          t.name,
+          t.GenreId
+   FROM Customer c
+   JOIN t_all t ON t.CustomerId = c.CustomerId
+   GROUP BY 2)
+SELECT DISTINCT t.g_count,
+                t.Country,
+                t.name,
+                t.GenreId,
+                t.CustomerId
+FROM maxed m
+LEFT JOIN t_all t ON t.Country = m.Country
+WHERE t.g_count = m.mmx
+ORDER BY 2;
+/* 3- track names that have a song length longer than the average song length?*/
+WITH millisec AS
+  (SELECT AVG(Milliseconds) AS time_msc
+   FROM track)
+SELECT t.name,
+       Milliseconds
+FROM Track t
+JOIN millisec m ON t.Milliseconds >= m.time_msc
+ORDER BY 2 DESC;
+
+/* 4- the customers that has spent the most on music for each country?*/
+
+WITH total_t AS
+  (SELECT c.Country,
+          SUM(i.total) spent,
+          c.FirstName,
+          c.LastName,
+          c.CustomerId
+   FROM Customer c
+   JOIN invoice i ON i.customerid = c.customerid
+   GROUP BY 1,
+            5
+   ORDER BY 2 DESC),
+     chck_max AS
+  (SELECT Country,
+          spent,
+          FirstName,
+          LastName,
+          CustomerId,
+          max(spent) OVER (PARTITION BY Country) AS max_spent,
+                          CASE
+                              WHEN spent = max(spent) OVER (PARTITION BY Country) THEN 'max'
+                              ELSE ''
+                          END AS chck
+   FROM total_t
+   GROUP BY 5
+   ORDER BY 1 DESC)
+SELECT Country,
+       spent,
+       FirstName,
+       LastName,
+       CustomerId
+FROM chck_max
+WHERE chck = 'max'
+ORDER BY 1 ;
+
